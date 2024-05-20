@@ -6075,6 +6075,7 @@ dependencies = [
  "wasmcloud-provider-messaging-kafka",
  "wasmcloud-provider-messaging-nats",
  "wasmcloud-provider-sdk",
+ "wasmcloud-provider-wadm",
  "wasmcloud-test-util",
  "wasmcloud-tracing",
  "wrpc-interface-http",
@@ -6499,6 +6500,30 @@ dependencies = [
  "wrpc-transport",
  "wrpc-transport-nats",
  "wrpc-types",
+]
+
+[[package]]
+name = "wasmcloud-provider-wadm"
+version = "0.20.0"
+dependencies = [
+ "anyhow",
+ "async-nats",
+ "bytes",
+ "futures",
+ "opentelemetry",
+ "opentelemetry-nats",
+ "rustls-pemfile 2.1.2",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-futures",
+ "tracing-opentelemetry",
+ "wadm",
+ "wascap 0.14.0",
+ "wash-lib",
+ "wasmcloud-provider-sdk",
+ "wit-bindgen-wrpc",
 ]
 
 [[package]]

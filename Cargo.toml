@@ -34,6 +34,7 @@ providers = [
     "dep:wasmcloud-provider-messaging-kafka",
     "dep:wasmcloud-provider-messaging-nats",
     "dep:wasmcloud-provider-sdk",
+    "dep:wasmcloud-provider-wadm",
 ]
 default = ["providers"]
 
@@ -77,6 +78,10 @@ required-features = ["providers"]
 name = "messaging-nats-provider"
 required-features = ["providers"]
 
+[[bin]]
+name = "wadm-provider"
+required-features = ["providers"]
+
 [profile.release]
 strip = true
 opt-level = "z"
@@ -110,6 +115,7 @@ wasmcloud-provider-keyvalue-vault = { workspace = true, optional = true }
 wasmcloud-provider-lattice-controller = { workspace = true, optional = true }
 wasmcloud-provider-messaging-kafka = { workspace = true, optional = true }
 wasmcloud-provider-messaging-nats = { workspace = true, optional = true }
+wasmcloud-provider-wadm = { workspace = true, optional = true }
 wasmcloud-provider-sdk = { workspace = true, features = [
     "otel",
 ], optional = true }
@@ -295,6 +301,7 @@ wasmcloud-provider-keyvalue-vault = { version = "*", path = "./crates/provider-k
 wasmcloud-provider-lattice-controller = { version = "*", path = "./crates/provider-lattice-controller", default-features = false }
 wasmcloud-provider-messaging-kafka = { version = "*", path = "./crates/provider-messaging-kafka", default-features = false }
 wasmcloud-provider-messaging-nats = { version = "*", path = "./crates/provider-messaging-nats", default-features = false }
+wasmcloud-provider-wadm = { version = "*", path = "./crates/provider-wadm", default-features = false }
 wasmcloud-provider-sdk = { version = "^0.5.0", path = "./crates/provider-sdk", default-features = false }
 wasmcloud-runtime = { version = "0", path = "./crates/runtime", default-features = false }
 wasmcloud-test-util = { version = "^0.2.0", path = "./crates/test-util", default-features = false }
