@@ -698,7 +698,7 @@ impl Provider for FsProvider {
         }
 
         // Determine the root path value
-        let root_val: PathBuf = match config.iter().find(|(key, _)| **key == "ROOT") {
+        let root_val: PathBuf = match config.iter().find(|(key, _)| key.to_uppercase() == "ROOT") {
             None => "/tmp".into(),
             Some((_, value)) => value.into(),
         };
@@ -714,25 +714,25 @@ impl Provider for FsProvider {
             &config.root
         );
 
-        // Save the configuration for the actor
+        // Save the configuration for the component
         self.config
             .write()
             .await
             .insert(source_id.into(), config.clone());
 
-        // Resolve the subpath from the root to the actor ID, carefully
+        // Resolve the subpath from the root to the component ID, carefully
         let actor_dir = match resolve_subpath(&config.root, source_id) {
             Ok(path) => path,
             Err(e) => {
-                error!("Failed to resolve subpath to actor directory: {e}");
-                return Err(anyhow!(e).context("failed to resolve subpath to actor dir"));
+                error!("Failed to resolve subpath to component directory: {e}");
+                return Err(anyhow!(e).context("failed to resolve subpath to component dir"));
             }
         };
 
-        // Create directory for the individual actor
+        // Create directory for the individual component
         if let Err(e) = create_dir_all(actor_dir.as_path()).await {
-            error!("Could not create actor directory: {:?}", e);
-            return Err(anyhow!(e).context("failed to create actor directory"));
+            error!("Could not create component directory: {:?}", e);
+            return Err(anyhow!(e).context("failed to create component directory"));
         }
 
         Ok(())

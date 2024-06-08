@@ -8,7 +8,7 @@ use anyhow::{bail, Context, Result};
 use async_nats::{Client, Message};
 use regex::Regex;
 use tracing::warn;
-use wadm::server::{
+use wadm_types::api::{
     DeleteModelRequest, DeleteModelResponse, DeployModelRequest, DeployModelResponse,
     GetModelRequest, GetModelResponse, ModelSummary, PutModelResponse, StatusResponse,
     UndeployModelRequest, VersionResponse,
@@ -36,19 +36,22 @@ pub enum ModelOperation {
     Status,
 }
 
-impl ToString for ModelOperation {
-    fn to_string(&self) -> String {
-        match self {
-            ModelOperation::List => "list",
-            ModelOperation::Get => "get",
-            ModelOperation::History => "versions",
-            ModelOperation::Delete => "del",
-            ModelOperation::Put => "put",
-            ModelOperation::Deploy => "deploy",
-            ModelOperation::Undeploy => "undeploy",
-            ModelOperation::Status => "status",
-        }
-        .to_string()
+impl std::fmt::Display for ModelOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ModelOperation::List => "list",
+                ModelOperation::Get => "get",
+                ModelOperation::History => "versions",
+                ModelOperation::Delete => "del",
+                ModelOperation::Put => "put",
+                ModelOperation::Deploy => "deploy",
+                ModelOperation::Undeploy => "undeploy",
+                ModelOperation::Status => "status",
+            }
+        )
     }
 }
 
@@ -65,6 +68,30 @@ impl AppManifest {
             resolve_relative_file_paths_in_yaml(content, base)?;
         }
         Ok(())
+    }
+
+    /// Retrieve the name of a given [`AppManifest`]
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            AppManifest::ModelName(name) => Some(name),
+            AppManifest::SerializedModel(manifest) => manifest
+                .get("metadata")?
+                .get("name")
+                .and_then(|v| v.as_str()),
+        }
+    }
+
+    /// Retrieve the version of a given [`AppManifest`], returning None if the manifest
+    /// does not contain a version (or is not the type to contain a version)
+    pub fn version(&self) -> Option<&str> {
+        match self {
+            AppManifest::ModelName(_) => None,
+            AppManifest::SerializedModel(manifest) => manifest
+                .get("metadata")?
+                .get("annotations")?
+                .get("version")
+                .and_then(|v| v.as_str()),
+        }
     }
 }
 
@@ -173,14 +200,13 @@ pub async fn undeploy_model(
     client: &Client,
     lattice: Option<String>,
     model_name: &str,
-    non_destructive: bool,
 ) -> Result<DeployModelResponse> {
     let res = model_request(
         client,
         ModelOperation::Undeploy,
         lattice,
         Some(model_name),
-        serde_json::to_vec(&UndeployModelRequest { non_destructive })?,
+        serde_json::to_vec(&UndeployModelRequest {})?,
     )
     .await?;
 
@@ -319,17 +345,13 @@ pub async fn delete_model_version(
     lattice: Option<String>,
     model_name: &str,
     version: Option<String>,
-    delete_all: bool,
 ) -> Result<DeleteModelResponse> {
     let res = model_request(
         client,
         ModelOperation::Delete,
         lattice,
         Some(model_name),
-        serde_json::to_vec(&DeleteModelRequest {
-            version: version.unwrap_or_default(),
-            delete_all,
-        })?,
+        serde_json::to_vec(&DeleteModelRequest { version })?,
     )
     .await?;
 
@@ -359,9 +381,8 @@ async fn model_request(
     // Topic is of the form of wadm.api.<lattice>.<category>.<operation>.<OPTIONAL: object_name>
     // We let callers of this function dictate the topic after the prefix + lattice
     let topic = format!(
-        "{WADM_API_PREFIX}.{}.model.{}{}",
+        "{WADM_API_PREFIX}.{}.model.{operation}{}",
         lattice.unwrap_or_else(|| DEFAULT_LATTICE.to_string()),
-        operation.to_string(),
         object_name
             .map(|name| format!(".{name}"))
             .unwrap_or_default()

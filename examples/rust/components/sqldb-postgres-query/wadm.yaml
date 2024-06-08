@@ -1,0 +1,38 @@
+---
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: rust-sqldb-postgres-query
+  annotations:
+    version: v0.1.0
+    description: |
+      Demo WebAssembly component using the wasmCloud SQLDB Postgres provider via the wasmcloud:postgres WIT interface
+spec:
+  components:
+    - name: querier
+      type: component
+      properties:
+        # To use the locally compiled code in this folder, use the line below instead after running `wash build`:
+        # image: file://./build/sqldb_postgres_query_s.wasm
+        image: ghcr.io/wasmcloud/components/sqldb-postgres-query-rust:0.1.0
+      traits:
+        # Govern the spread/scheduling of the actor
+        - type: spreadscaler
+          properties:
+            replicas: 1
+        - type: link
+          properties:
+            target: sqldb-postgres
+            namespace: wasmcloud
+            package: postgres
+            interfaces: [query]
+            target_config:
+              - name: default-postgres
+
+    # Add a capability provider that interacts with the filesystem
+    - name: sqldb-postgres
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/sqldb-postgres:0.1.0
+        config:
+          - name: "default-postgres"

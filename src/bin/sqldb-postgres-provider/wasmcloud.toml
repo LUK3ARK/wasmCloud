@@ -1,0 +1,11 @@
+name = "SQLDB Postgres"
+language = "rust"
+type = "provider"
+version = "0.1.0"
+
+[rust]
+target_path = "../../target"
+
+[provider]
+bin_name = "sqldb-postgres-provider"
+vendor = "wasmCloud"

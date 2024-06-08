@@ -4,6 +4,8 @@ use serde::Deserialize;
 use wasmcloud_control_interface::{Host, HostInventory};
 use wasmcloud_core::{InterfaceLinkDefinition, LinkName};
 
+use wadm_types::validation::ValidationFailure;
+
 /// JSON Output of the `wash start` command
 #[derive(Debug, Deserialize)]
 pub struct StartCommandOutput {
@@ -93,4 +95,22 @@ pub struct LabelHostCommandOutput {
     pub success: bool,
     pub deleted: bool,
     pub processed: Vec<(String, String)>,
+}
+
+/// JSON output representation of the `wash up` command
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpCommandOutput {
+    pub success: bool,
+    pub kill_cmd: String,
+    pub wasmcloud_log: String,
+    pub nats_url: String,
+    pub deployed_wadm_manifest_path: Option<String>,
+}
+
+/// JSON output representation of the `wash app validate` command
+#[derive(Debug, Deserialize)]
+pub struct AppValidateOutput {
+    pub valid: bool,
+    pub warnings: Vec<ValidationFailure>,
+    pub errors: Vec<ValidationFailure>,
 }

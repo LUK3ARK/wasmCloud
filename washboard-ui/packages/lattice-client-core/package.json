@@ -2,7 +2,7 @@
   "name": "@wasmcloud/lattice-client-core",
   "packageManager": "yarn@4.2.2",
   "license": "Apache-2.0",
-  "version": "0.3.1",
+  "version": "0.3.3",
   "description": "Framework-agnostic core package for the wasmCloud Lattice Client",
   "author": "wasmCloud",
   "repository": {
@@ -48,10 +48,10 @@
     "@types/eslint": "~8.56.10",
     "@wasmcloud/eslint-config": "workspace:^",
     "@wasmcloud/tsconfig": "workspace:^",
-    "tsup": "^8.0.2",
-    "type-fest": "^4.18.2"
+    "tsup": "^8.1.0",
+    "type-fest": "^4.20.0"
   },
   "dependencies": {
-    "nats.ws": "^1.26.0"
+    "nats.ws": "^1.27.0"
   }
 }

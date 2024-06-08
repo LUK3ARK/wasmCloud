@@ -35,8 +35,9 @@ const columns = [
       expandedRow: 'empty',
     },
   }),
-  columnHelper.accessor('name', {
-    header: 'Name',
+  columnHelper.accessor('id', {
+    header: 'ID',
+    cell: (info) => <ShortCopy text={info.getValue()} />,
     meta: {
       baseRow: 'visible',
       expandedRow: 'empty',
@@ -84,9 +85,8 @@ const columns = [
       },
     },
   }),
-  columnHelper.accessor('id', {
-    header: 'ID',
-    cell: (info) => <ShortCopy text={info.getValue()} />,
+  columnHelper.accessor('max_instances', {
+    header: 'Max Count',
     meta: {
       baseRow: 'visible',
       expandedRow: 'empty',

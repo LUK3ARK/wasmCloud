@@ -46,7 +46,7 @@ pub trait WascapEntity: Clone {
 /// The metadata that corresponds to a component
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
 pub struct Component {
-    /// A descriptive name for this actor, should not include version information or public key
+    /// A descriptive name for this component, should not include version information or public key
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 
@@ -103,7 +103,7 @@ pub struct Account {
     /// A descriptive name for this account
     pub name: Option<String>,
     /// A list of valid public keys that may appear as an `issuer` on
-    /// actors signed by one of this account's multiple seed keys
+    /// components signed by one of this account's multiple seed keys
     pub valid_signers: Option<Vec<String>>,
 }
 
@@ -136,6 +136,15 @@ pub struct Invocation {
     /// Hash of the invocation to which these claims belong
     #[serde(rename = "hash")]
     pub invocation_hash: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
+pub struct Host {
+    /// Optional friendly descriptive name for the host
+    pub name: Option<String>,
+    /// Optional labels for the host
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub labels: Option<HashMap<String, String>>,
 }
 
 /// Represents a set of [RFC 7519](https://tools.ietf.org/html/rfc7519) compliant JSON Web Token
@@ -283,6 +292,15 @@ impl WascapEntity for Cluster {
 impl WascapEntity for Invocation {
     fn name(&self) -> String {
         self.target_url.to_string()
+    }
+}
+
+impl WascapEntity for Host {
+    fn name(&self) -> String {
+        self.name
+            .as_ref()
+            .unwrap_or(&"Unnamed Host".to_string())
+            .to_string()
     }
 }
 
@@ -472,7 +490,7 @@ impl Claims<Cluster> {
 }
 
 impl Claims<Component> {
-    /// Creates a new non-expiring Claims wrapper for metadata representing an actor
+    /// Creates a new non-expiring Claims wrapper for metadata representing an component
     #[allow(clippy::too_many_arguments)]
     #[must_use]
     pub fn new(
@@ -490,7 +508,7 @@ impl Claims<Component> {
         )
     }
 
-    /// Creates a new Claims wrapper for metadata representing an actor, with optional valid before and expiration dates
+    /// Creates a new Claims wrapper for metadata representing an component, with optional valid before and expiration dates
     #[allow(clippy::too_many_arguments)]
     #[must_use]
     pub fn with_dates(
@@ -547,6 +565,42 @@ impl Claims<Invocation> {
                 target_url: target_url.to_string(),
                 origin_url: origin_url.to_string(),
                 invocation_hash: hash.to_string(),
+            }),
+            expires,
+            id: nuid::next(),
+            issued_at: since_the_epoch().as_secs(),
+            issuer,
+            subject,
+            not_before,
+            wascap_revision: Some(WASCAP_INTERNAL_REVISION),
+        }
+    }
+}
+
+impl Claims<Host> {
+    /// Creates a new non-expiring Claims wrapper for metadata representing a host
+    #[must_use]
+    pub fn new(
+        name: String,
+        issuer: String,
+        subject: String,
+        tags: Option<HashMap<String, String>>,
+    ) -> Self {
+        Self::with_dates(name, issuer, subject, None, None, tags)
+    }
+
+    pub fn with_dates(
+        name: String,
+        issuer: String,
+        subject: String,
+        not_before: Option<u64>,
+        expires: Option<u64>,
+        tags: Option<HashMap<String, String>>,
+    ) -> Claims<Host> {
+        Claims {
+            metadata: Some(Host {
+                name: Some(name),
+                labels: tags,
             }),
             expires,
             id: nuid::next(),
@@ -851,9 +905,19 @@ impl Invocation {
     }
 }
 
+impl Host {
+    #[must_use]
+    pub fn new(name: String, labels: HashMap<String, String>) -> Host {
+        Host {
+            name: Some(name),
+            labels: Some(labels),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::{Account, Claims, Component, ErrorKind, KeyPair, Operator};
+    use super::{Account, Claims, Component, ErrorKind, Host, KeyPair, Operator};
     use crate::jwt::{
         since_the_epoch, validate_token, CapabilityProvider, ClaimsBuilder, Cluster,
         WASCAP_INTERNAL_REVISION,
@@ -991,7 +1055,7 @@ mod test {
     }
 
     #[test]
-    fn decode_actor_as_operator() {
+    fn decode_component_as_operator() {
         let kp = KeyPair::new_account();
         let claims = Claims {
             metadata: Some(Component::new(
@@ -1096,7 +1160,7 @@ mod test {
               },
               "easterEgg": {
                 "description": "Indicates whether or not the easter egg should be displayed",
-                "type": "boolean"                
+                "type": "boolean"
               }
             }
           }
@@ -1343,6 +1407,44 @@ mod test {
             validate_token::<Component>(correct_but_wrong).is_err_and(|e| !e
                 .to_string()
                 .contains("invalid token format, expected 3 segments"))
+        );
+    }
+
+    #[test]
+    fn ensure_host_validation() {
+        let signer = KeyPair::new_account();
+        let host = KeyPair::new_server();
+        let mut claims = Claims {
+            metadata: Some(Host::new("test".to_string(), HashMap::new())),
+            expires: None,
+            id: nuid::next(),
+            issued_at: 0,
+            issuer: signer.public_key(),
+            subject: host.public_key().to_string(),
+            not_before: None,
+            wascap_revision: Some(WASCAP_INTERNAL_REVISION),
+        };
+
+        let encoded = claims.encode(&signer).unwrap();
+        let decoded = Claims::<Host>::decode(&encoded);
+        assert!(decoded.is_ok());
+        let decoded_claims = decoded.unwrap();
+        assert_eq!(
+            decoded_claims.metadata.unwrap().labels,
+            Some(HashMap::new())
+        );
+
+        let validation = validate_token::<Host>(&encoded);
+        assert!(validation.is_ok());
+        assert!(validation.unwrap().signature_valid);
+
+        claims.metadata.as_mut().unwrap().labels =
+            Some(HashMap::from([("test".to_string(), "value".to_string())]));
+        let encoded = claims.encode(&signer).unwrap();
+        let decoded = Claims::<Host>::decode(&encoded).unwrap();
+        assert_eq!(
+            decoded.metadata.unwrap().labels,
+            Some(HashMap::from([("test".to_string(), "value".to_string())]))
         );
     }
 }

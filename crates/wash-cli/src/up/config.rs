@@ -10,9 +10,9 @@ pub const DEFAULT_NATS_HOST: &str = "127.0.0.1";
 pub const DEFAULT_NATS_PORT: &str = "4222";
 pub const DEFAULT_NATS_WEBSOCKET_PORT: &str = "4223";
 // wadm configuration values
-pub const WADM_VERSION: &str = "v0.11.2";
-// wasmCloud configuration values, https://wasmcloud.dev/reference/host-runtime/host_configure/
-pub const WASMCLOUD_HOST_VERSION: &str = "v1.0.2";
+pub const WADM_VERSION: &str = "v0.12.0";
+// wasmCloud configuration values, https://wasmcloud.com/docs/reference/host-config
+pub const WASMCLOUD_HOST_VERSION: &str = "v1.0.3";
 // NATS isolation configuration variables
 pub const WASMCLOUD_LATTICE: &str = "WASMCLOUD_LATTICE";
 pub const DEFAULT_LATTICE: &str = "default";
@@ -30,6 +30,7 @@ pub const WASMCLOUD_RPC_JWT: &str = "WASMCLOUD_RPC_JWT";
 pub const WASMCLOUD_RPC_SEED: &str = "WASMCLOUD_RPC_SEED";
 pub const WASMCLOUD_RPC_CREDSFILE: &str = "WASMCLOUD_RPC_CREDSFILE";
 pub const WASMCLOUD_RPC_TLS: &str = "WASMCLOUD_RPC_TLS";
+pub const WASMCLOUD_RPC_TLS_CA_FILE: &str = "WASMCLOUD_RPC_TLS_CA_FILE";
 // NATS CTL connection configuration
 pub const WASMCLOUD_CTL_HOST: &str = "WASMCLOUD_CTL_HOST";
 pub const WASMCLOUD_CTL_PORT: &str = "WASMCLOUD_CTL_PORT";
@@ -37,6 +38,7 @@ pub const WASMCLOUD_CTL_SEED: &str = "WASMCLOUD_CTL_SEED";
 pub const WASMCLOUD_CTL_JWT: &str = "WASMCLOUD_CTL_JWT";
 pub const WASMCLOUD_CTL_CREDSFILE: &str = "WASMCLOUD_CTL_CREDSFILE";
 pub const WASMCLOUD_CTL_TLS: &str = "WASMCLOUD_CTL_TLS";
+pub const WASMCLOUD_CTL_TLS_CA_FILE: &str = "WASMCLOUD_CTL_TLS_CA_FILE";
 // NATS Provider RPC connection configuration
 pub const WASMCLOUD_PROV_SHUTDOWN_DELAY_MS: &str = "WASMCLOUD_PROV_SHUTDOWN_DELAY_MS";
 pub const DEFAULT_PROV_SHUTDOWN_DELAY_MS: &str = "300";

@@ -1,17 +1,17 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 use clap::{Args, Subcommand};
 use serde_json::json;
-use wadm::server::{
+use wadm_types::api::{
     DeleteModelResponse, DeployModelResponse, GetModelResponse, GetResult, ModelSummary,
     PutModelResponse, PutResult, StatusResponse, VersionResponse,
 };
-use wash_lib::{
-    app::{load_app_manifest, AppManifest},
-    cli::{CliConnectionOpts, CommandOutput, OutputKind},
-    config::WashConnectionOptions,
-};
+use wadm_types::validation::{validate_manifest_file, ValidationFailure, ValidationOutput};
+use wash_lib::app::{load_app_manifest, AppManifest};
+use wash_lib::cli::{CliConnectionOpts, CommandOutput, OutputKind};
+use wash_lib::config::WashConnectionOptions;
 
 use crate::appearance::spinner::Spinner;
 
@@ -43,6 +43,9 @@ pub enum AppCliCommand {
     /// Undeploy an application, removing it from the lattice
     #[clap(name = "undeploy")]
     Undeploy(UndeployCommand),
+    /// Validate an application manifest
+    #[clap(name = "validate")]
+    Validate(ValidateCommand),
 }
 
 #[derive(Args, Debug, Clone)]
@@ -56,10 +59,6 @@ pub struct UndeployCommand {
     /// Name of the app specification to undeploy
     #[clap(name = "name")]
     model_name: String,
-
-    /// Whether or not to delete resources that are undeployed. Defaults to remove managed resources
-    #[clap(long = "non-destructive")]
-    non_destructive: bool,
 
     #[clap(flatten)]
     opts: CliConnectionOpts,
@@ -75,22 +74,22 @@ pub struct DeployCommand {
     #[clap(name = "version")]
     version: Option<String>,
 
+    /// Whether or not wash should attempt to replace the resources by performing an optimistic delete shortly before applying resources.
+    #[clap(long = "replace")]
+    replace: bool,
+
     #[clap(flatten)]
     opts: CliConnectionOpts,
 }
 
 #[derive(Args, Debug, Clone)]
 pub struct DeleteCommand {
-    /// Name of the app specification to delete
+    /// Name of the app specification to delete, or a path to a WADM Application Manifest
     #[clap(name = "name")]
     model_name: String,
 
-    #[clap(long = "delete-all")]
-    /// Whether or not to delete all app versions, defaults to `false`
-    delete_all: bool,
-
     /// Version of the app specification to delete. Not required if --delete-all is supplied
-    #[clap(name = "version", required_unless_present("delete_all"))]
+    #[clap(name = "version")]
     version: Option<String>,
 
     #[clap(flatten)]
@@ -138,6 +137,13 @@ pub struct HistoryCommand {
 
     #[clap(flatten)]
     opts: CliConnectionOpts,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct ValidateCommand {
+    /// Path to the application manifest to validate
+    #[clap(name = "application")]
+    application: PathBuf,
 }
 
 pub async fn handle_command(
@@ -188,6 +194,13 @@ pub async fn handle_command(
             let results = undeploy_model(cmd).await?;
             show_undeploy_results(results)
         }
+        Validate(cmd) => {
+            sp.update_spinner_message("Validating application manifest ... ".to_string());
+            let (_manifest, validation_results) = validate_manifest_file(&cmd.application)
+                .await
+                .context("failed to validate WADM manifest")?;
+            show_validate_manifest_results(validation_results)
+        }
     };
     sp.finish_and_clear();
 
@@ -201,7 +214,7 @@ async fn undeploy_model(cmd: UndeployCommand) -> Result<DeployModelResponse> {
 
     let client = connection_opts.into_nats_client().await?;
 
-    wash_lib::app::undeploy_model(&client, lattice, &cmd.model_name, cmd.non_destructive).await
+    wash_lib::app::undeploy_model(&client, lattice, &cmd.model_name).await
 }
 
 async fn deploy_model(cmd: DeployCommand) -> Result<DeployModelResponse> {
@@ -216,10 +229,31 @@ async fn deploy_model(cmd: DeployCommand) -> Result<DeployModelResponse> {
         None => load_app_manifest("-".parse()?).await?,
     };
 
-    match app_manifest {
+    // If --replace was specified, we should attempt to replace the resources by deleting them beforehand
+    if cmd.replace {
+        if let (Some(name), version) = (app_manifest.name(), app_manifest.version().map(Into::into))
+        {
+            if let Err(e) =
+                wash_lib::app::delete_model_version(&client, lattice.clone(), name, version).await
+            {
+                eprintln!("🟨 Failed to delete model during replace operation: {e}");
+            }
+        }
+    }
+
+    deploy_model_from_manifest(&client, lattice, app_manifest, cmd.version).await
+}
+
+pub(crate) async fn deploy_model_from_manifest(
+    client: &async_nats::Client,
+    lattice: Option<String>,
+    manifest: AppManifest,
+    version: Option<String>,
+) -> Result<DeployModelResponse> {
+    match manifest {
         AppManifest::SerializedModel(manifest) => {
             let put_res = wash_lib::app::put_model(
-                &client,
+                client,
                 lattice.clone(),
                 serde_yaml::to_string(&manifest)
                     .context("failed to convert manifest to string")?
@@ -231,10 +265,10 @@ async fn deploy_model(cmd: DeployCommand) -> Result<DeployModelResponse> {
                 PutResult::Created | PutResult::NewVersion => put_res.name,
                 _ => bail!("Could not put manifest to deploy {}", put_res.message),
             };
-            wash_lib::app::deploy_model(&client, lattice, &model_name, cmd.version).await
+            wash_lib::app::deploy_model(client, lattice, &model_name, version).await
         }
         AppManifest::ModelName(model_name) => {
-            wash_lib::app::deploy_model(&client, lattice, &model_name, cmd.version).await
+            wash_lib::app::deploy_model(client, lattice, &model_name, version).await
         }
     }
 }
@@ -305,14 +339,27 @@ async fn delete_model_version(cmd: DeleteCommand) -> Result<DeleteModelResponse>
 
     let client = connection_opts.into_nats_client().await?;
 
-    wash_lib::app::delete_model_version(
-        &client,
-        lattice,
-        &cmd.model_name,
-        cmd.version,
-        cmd.delete_all,
-    )
-    .await
+    // If we have received a valid path to a model file, then read and extract the model name,
+    // otherwise use the supplied name as a model name
+    let (model_name, version): (String, Option<String>) = if tokio::fs::try_exists(&cmd.model_name)
+        .await
+        .is_ok_and(|exists| exists)
+    {
+        let manifest = load_app_manifest(cmd.model_name.parse()?)
+            .await
+            .with_context(|| format!("failed to load app manifest at [{}]", cmd.model_name))?;
+        (
+            manifest
+                .name()
+                .map(Into::into)
+                .context("failed to find name of manifest")?,
+            manifest.version().map(Into::into),
+        )
+    } else {
+        (cmd.model_name, cmd.version)
+    };
+
+    wash_lib::app::delete_model_version(&client, lattice, &model_name, version).await
 }
 
 async fn get_models(cmd: ListCommand) -> Result<Vec<ModelSummary>> {
@@ -378,4 +425,35 @@ fn show_model_status(model_name: String, results: StatusResponse) -> CommandOutp
         output::status_table(model_name, results.status.unwrap_or_default()),
         map,
     )
+}
+
+fn show_validate_manifest_results(messages: impl AsRef<[ValidationFailure]>) -> CommandOutput {
+    let messages = messages.as_ref();
+    let valid = messages.valid();
+    let warnings = messages
+        .warnings()
+        .into_iter()
+        .cloned()
+        .collect::<Vec<ValidationFailure>>();
+    let errors = messages
+        .errors()
+        .into_iter()
+        .cloned()
+        .collect::<Vec<ValidationFailure>>();
+    let message = if valid {
+        "manifest is valid".into()
+    } else {
+        format!(
+            r#"invalid manifest:
+warnings: {warnings:#?}
+errors: {errors:#?}
+"#
+        )
+    };
+    let json_output = HashMap::<String, serde_json::Value>::from([
+        ("valid".into(), messages.valid().into()),
+        ("warnings".into(), json!(warnings)),
+        ("errors".into(), json!(errors)),
+    ]);
+    CommandOutput::new(message, json_output)
 }

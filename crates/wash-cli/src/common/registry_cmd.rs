@@ -7,8 +7,8 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tracing::warn;
 use wash_lib::registry::{
-    pull_oci_artifact, push_oci_artifact, validate_artifact, OciPullOptions, OciPushOptions,
-    SupportedArtifacts,
+    identify_artifact, pull_oci_artifact, push_oci_artifact, ArtifactType, OciPullOptions,
+    OciPushOptions,
 };
 use wash_lib::{
     cli::{
@@ -44,7 +44,7 @@ pub async fn registry_pull(
     }?;
 
     let artifact = pull_oci_artifact(
-        image.whole(),
+        &image,
         OciPullOptions {
             digest: cmd.digest,
             allow_latest: cmd.allow_latest,
@@ -73,9 +73,9 @@ pub async fn write_artifact(
     image: &Reference,
     output: Option<String>,
 ) -> Result<String> {
-    let file_extension = match validate_artifact(artifact).await? {
-        SupportedArtifacts::Par => PROVIDER_ARCHIVE_FILE_EXTENSION,
-        SupportedArtifacts::Wasm => WASM_FILE_EXTENSION,
+    let file_extension = match identify_artifact(artifact).await? {
+        ArtifactType::Par => PROVIDER_ARCHIVE_FILE_EXTENSION,
+        ArtifactType::Wasm => WASM_FILE_EXTENSION,
     };
     // Output to provided file, or use artifact_name.file_extension
     let outfile = output.unwrap_or_else(|| {
