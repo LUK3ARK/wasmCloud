@@ -6246,21 +6246,19 @@ dependencies = [
  "tracing-futures",
  "ulid",
  "uuid 1.8.0",
- "wadm-types",
+ "wadm-types 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasmcloud-control-interface 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "wadm-client"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54dff43b877842c657447e073a87b9d636fac74b1b97cc3032e946fbd637760c"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "async-nats",
  "bytes",
+ "futures",
  "nkeys 0.3.2",
- "once_cell",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -6268,7 +6266,39 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-futures",
- "wadm-types",
+ "wadm-types 0.1.0",
+]
+
+[[package]]
+name = "wadm-types"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-nats",
+ "async-trait",
+ "base64 0.21.7",
+ "bytes",
+ "chrono",
+ "cloudevents-sdk",
+ "indexmap 2.2.6",
+ "jsonschema",
+ "lazy_static",
+ "nkeys 0.3.2",
+ "rand 0.8.5",
+ "regex",
+ "semver",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-futures",
+ "ulid",
+ "uuid 1.8.0",
+ "wasmcloud-control-interface 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wit-bindgen-wrpc",
 ]
 
 [[package]]
@@ -6442,7 +6472,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
- "wadm-types",
+ "wadm-types 0.1.0",
  "warp",
  "wascap 0.15.0",
  "wash-lib",
@@ -6509,7 +6539,7 @@ dependencies = [
  "toml 0.8.14",
  "tracing",
  "url",
- "wadm-types",
+ "wadm-types 0.1.0",
  "walkdir",
  "wascap 0.15.0",
  "wasm-encoder 0.208.1",
@@ -7228,7 +7258,7 @@ dependencies = [
  "tracing-opentelemetry 0.24.0",
  "wadm",
  "wadm-client",
- "wadm-types",
+ "wadm-types 0.1.0",
  "wascap 0.15.0",
  "wash-lib",
  "wasmcloud-provider-sdk",
