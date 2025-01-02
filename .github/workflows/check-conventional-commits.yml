@@ -1,0 +1,113 @@
+name: check-conventional-commits
+
+on: [pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Action Meta
+        id: meta
+        run: |
+          # build action meta
+          echo "fetch_depth=$(( ${{ github.event.pull_request.commits }} + 100 ))" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR branch & commits
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: ${{ steps.meta.outputs.fetch_depth }}
+
+      - name: Fetch Base commit
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+
+      - name: Install convco
+        uses: taiki-e/install-action@77b010ce7843a10f653ccb6b0967bda4c3d81091 # v2.47.1
+        with:
+          tool: convco@0.6.1
+
+      - name: Check commits for formatting
+        id: lint
+        run: |
+          set +e
+          OUTPUT=$(convco check ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+          set -e
+
+          # output results
+          if [[ $OUTPUT =~ FAIL ]]; then
+            echo '---- errors found ----'
+            RAW_ERRORS=$(echo "$OUTPUT" | grep -x '^FAIL.*$')
+            echo "$RAW_ERRORS"
+            JSON_OUTPUT=$(echo "$RAW_ERRORS" | jq -R -c 'split("\n") | map(split("  ") | { "sha": .[1], "error": .[2], "message": .[3] }) | { "commits": ., "errors": length }')
+            echo '-------- json --------'
+            echo "$JSON_OUTPUT"
+            echo '----------------------'
+            {
+              echo "json_output=$JSON_OUTPUT"
+              echo "raw_output<<EOF"
+              echo "$OUTPUT"
+              echo "EOF"
+              echo "raw_errors=$RAW_ERRORS"
+            } >> "$GITHUB_OUTPUT"
+            exit 1
+          else
+            echo '---- no errors found ----'
+            {
+              echo "json_output=$(jq -n -c '{ "commits": [], "count": 0 }')" >> "$GITHUB_OUTPUT"
+              echo 'raw_errors=""'
+              echo "raw_output<<EOF" 
+              echo "$OUTPUT"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+      - name: Job Summary
+        if: always()
+        env:
+          JOB_OUTPUT: ${{ steps.lint.outputs.raw_output }}
+          JOB_STATUS: ${{ steps.lint.outcome == 'success' && '✅' || steps.lint.outcome == 'failure' && '❌' || steps.lint.outcome == 'cancelled' && '🚫' }}
+        run: |
+          {
+            echo "## $JOB_STATUS Conventional Commits"
+            echo '```'
+            echo "$JOB_OUTPUT"
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Parse Errors
+        if: always()
+        id: parse
+        env:
+          JSON_OUTPUT: ${{ steps.lint.outputs.json_output }}
+        run: |
+          export MD_ERRORS_ROWS=$(echo "$JSON_OUTPUT" | jq -r '.commits | map("| **\(.sha)** | \(.error) | \(.message) |") | join("\n")')
+          export MD_ERRORS_COUNT=${{ fromJson(steps.lint.outputs.json_output).count || 0 }}
+          envsubst < .github/templates/conventional-commit.md > ./conventional-commit.md
+
+      - name: Create PR Comment
+        # If the workflow failed, create a comment on the PR with the errors
+        if: steps.lint.outcome == 'failure'
+        uses: marocchino/sticky-pull-request-comment@331f8f5b4215f0445d3c07b4967662a32a2d3e31 # v2.9.0
+        with:
+          number: ${{ github.event.pull_request.number }}
+          header: tip-conventional-commits
+          recreate: true
+          hide_and_recreate: true
+          path: ./conventional-commit.md
+
+      - name: Hide PR Comment
+        # If the workflow is now successful, we can resolve the original comment
+        if: steps.lint.outcome == 'success'
+        uses: marocchino/sticky-pull-request-comment@331f8f5b4215f0445d3c07b4967662a32a2d3e31 # v2.9.0
+        with:
+          number: ${{ github.event.pull_request.number }}
+          header: tip-conventional-commits
+          hide: true
+          hide_classify: 'RESOLVED'

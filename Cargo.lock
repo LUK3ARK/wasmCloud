@@ -9063,7 +9063,9 @@ name = "wasmcloud-tracing"
 version = "0.11.0"
 dependencies = [
  "anyhow",
+ "bytes",
  "heck 0.5.0",
+ "http 1.2.0",
  "once_cell",
  "opentelemetry",
  "opentelemetry-appender-tracing",
