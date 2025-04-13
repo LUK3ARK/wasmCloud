@@ -13,7 +13,7 @@ use wasmtime::{InstanceAllocationStrategy, PoolingAllocationConfig};
 // pub const MAX_LINEAR_MEMORY: u64 = 256 * 1024 * 1024;
 pub const MAX_LINEAR_MEMORY: u64 = 32 * 1024 * 1024;
 /// Default max component size (50 MiB)
-pub const MAX_COMPONENT_SIZE: u64 = 10 * 1024 * 1024;
+pub const MAX_COMPONENT_SIZE: u64 = 4 * 1024 * 1024;
 /// Default max number of components
 pub const MAX_COMPONENTS: u32 = 10_000;
 
