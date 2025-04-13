@@ -133,7 +133,7 @@ impl RuntimeBuilder {
         // configure all these values via something smarter that can look at total memory available
         let memories_per_component = 1;
         let tables_per_component = 1;
-        let max_core_instances_per_component = 50;
+        let max_core_instances_per_component = 10;
         let table_elements = 15000;
 
         #[allow(clippy::cast_possible_truncation)]
